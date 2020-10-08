@@ -1,0 +1,122 @@
+---
+title: "Target Rate Impacts Measure of Discriminability (d')"
+runtime: shiny
+output: html_document
+---
+
+[Trisha N. Patel](https://tnpatel.github.io/) 
+
+Signal Detection Theory (SDT) is used in situations where one is trying to detect a signal among noise. The SDT framework provides a measure of discriminability (d') that can summarize the ability to accurately distinguish information-baring patterns from random patterns. 
+
+The following simulation demonstrates how target rate (the number of targets presented in a set of trials) can influence the measurement of d'.
+
+
+### Parameter Inputs
+
+```{r echo = FALSE}
+fluidRow(
+  
+  column(4,
+         wellPanel(
+           sliderInput("dpop", label = "Population d'",
+                       min = 0, max = 3, value = 0.7, step = .1),
+           sliderInput("crit", label = "Criterion",
+                       min = -3, max = 3, value = 0, step = 0.1),
+           sliderInput("ntrials", label = "Number of Trials",
+                       min = 1, max = 500, value = 100, step = 1),
+           radioButtons("nsim", label= "Number of Simulations in a Sample", choices = c("100", "1000"), inline= TRUE)
+           
+         )       
+  ),
+  
+  column(8,
+         renderPlot({
+           
+           d = input$dpop
+           c = input$crit
+           s <- seq(-3,3,0.01)
+           
+           n1 <- data.frame(x = s, y = dnorm(s, mean = 0, sd = 1))
+           n2 <- data.frame(x = s, y = dnorm(s, mean = d, sd = 1))
+           
+           plot(n1$x, n1$y, type="l", xaxt = "n", yaxt = "n", ylab = "", xlab="", col="red4")
+           lines(n2$x, n2$y, col="skyblue4")
+           abline(v = c, lty=2)
+           text(0, 0.01, "Noise", col="red4", cex = 1.25)
+           text(d, 0.01, "Signal", col = "skyblue4", cex=1.25)
+           text(c-.1, 0.2, "Criterion",srt=90, cex=1.25)
+           
+           
+         })
+  )
+)
+```
+
+
+```{r echo = FALSE}
+dprimesim <- function(dpop, c, trials, sims) {
+  
+  results <- vector()
+  ntargets <- vector()
+  d <- vector()
+  
+  #for all the n targets
+  for (t in 1:(trials-1)) {
+    
+    #simulate 1000 people and get an average
+    for (sub in 1:sims) {
+      
+      #sample values to represent responses
+      nt <- trials - t
+      nt_resp <- rnorm(nt,m=0,sd=1)
+      t_resp <- rnorm(t,m=dpop,sd=1)
+      
+      #set criterion and get HIT and FA rates
+      hr <- sum(t_resp >= c)/t
+      far <- sum(nt_resp >= c)/nt
+      
+      #adjust if they are 0 or 1
+      if (hr == 0) {
+        hr = 1/(2*t)
+      }
+      
+      if (hr == 1) {
+        hr = 1 - 1/(2*t)
+      }
+      
+      if (far == 0) {
+        far = 1/(2*nt)
+      }
+      
+      if (far == 1) {
+        far = 1 - (1/(2*nt))
+      }
+      
+      #calculate d'
+      #store subject sim
+      results[sub] = qnorm(hr) - qnorm(far)
+    }
+    
+    #store results
+    ntargets[t] = (t/trials)
+    d[t] = mean(results)
+  }
+  
+  return(data.frame("xvalues" = ntargets, "yvalues" = d))
+}
+
+```
+
+```{r echo = FALSE}
+
+#graph rate of targets (x-axis) and d' (y-axis)
+renderPlot({
+  
+  sample <- dprimesim(input$dpop,input$crit,input$ntrials, as.numeric(input$nsim))
+  
+  plot(sample$xvalues, sample$yvalues, type = "b", pch = 19, 
+       col = "skyblue4", xlab = "Target Rate (Number of Targets/Total Trials)", ylab = "Discriminability (d')", ylim=c(0,3))
+  
+  abline(h=input$dpop, lty=2)
+})
+```
